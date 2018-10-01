@@ -22,8 +22,8 @@ int bytes_read = 0;
 const int FIELD_LENGTH = 64; // Fields stored in EEPROM are 64 bits long
 
 
-#define CONNECTION_LED_PIN D3
-#define TRANSMIT_LED_PIN D4
+#define CONNECTION_LED_PIN D5
+#define TRANSMIT_LED_PIN D6
 
 /* Pin definitions: */
 #define RX D1
