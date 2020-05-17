@@ -1,7 +1,20 @@
+
+/*
+    WIFI enabled LoRa Gateway for handling rat trap sensor data
+    and soil moisture sensor data. Communication with LORA is via Serial
+    connnection to Arduino Pro Mini
+
+    Quentin McDonald
+    2018
+*/
+
+
 #include <SoftwareSerial.h>
 #include <ESP8266WiFi.h>
 #include "Gsender.h"
 #include <EEPROM.h>
+#include <WiFiClient.h>
+#include <WiFiUdp.h>
 
 
 #pragma region Globals
@@ -47,6 +60,47 @@ String read_field( int idx ) {
   return fld;
 }
 
+
+void post_data(const String& dstring) {
+
+
+  Serial.println("Posting data string:");
+  Serial.println(dstring);
+
+  // Use WiFiClient class to create TCP connections
+  WiFiClient client;
+  const char* host = "192.168.1.13";
+  const int httpPort = 8080;
+  if (!client.connect(host, httpPort)) {
+    Serial.println("connection failed");
+    return;
+  }
+
+  //  // We now create a URI for the request
+  String url = "/input/";
+
+
+  client.print(String("POST ") + url + " HTTP/1.1\r\n" +
+               "Host: " + host + "\r\n" +
+               "Accept: */*\r\n" +
+               "Content-Length: " + dstring.length() + "\r\n" +
+               "Content-Type: application/x-www-form-urlencoded\r\n\r\n");
+  client.println(dstring);
+
+  delay(10);
+
+  // Read all the lines of the reply from server and print them to Serial
+  while (client.available()) {
+    String line = client.readStringUntil('\r');
+    Serial.print(line);
+  }
+
+  Serial.println();
+  Serial.println("closing connection");
+
+
+
+}
 
 
 uint8_t WiFiConnect(const char* nSSID = nullptr, const char* nPassword = nullptr)
@@ -111,7 +165,58 @@ void send_email( const String& address, const String& subject, const String& mes
 
 }
 
+void send_rat_trap_email(String& data_string ) {
+  
+  digitalWrite(TRANSMIT_LED_PIN, HIGH);
+  delay(500);
+  digitalWrite(TRANSMIT_LED_PIN, LOW);
+  delay(250);
+  digitalWrite(TRANSMIT_LED_PIN, HIGH);
+  delay(500);
+  digitalWrite(TRANSMIT_LED_PIN, LOW);
+  delay(1000);
+  send_email(EMAIL_ADDRESS, "Rat Trap Triggered", data_string);
+  digitalWrite(TRANSMIT_LED_PIN, HIGH);
+  delay(500);
+  digitalWrite(TRANSMIT_LED_PIN, LOW);
+}
 
+bool is_moisture_data( const String& data_string ) {
+  return (data_string[0] == 'M' && data_string[1] == 'S' && data_string[2] == ':');
+}
+
+bool is_temperature_data( const String& data_string ) {
+  return (data_string[0] == 'T' && data_string[1] == 'P' && data_string[2] == ':');
+}
+
+void send_moisture_data( String data_string ) {
+/* Split up the moisture data and send to the database server */
+  Serial.print("Parsing Moisture Data: ");
+  Serial.println(data_string );
+  String station = data_string.substring( 4, 10 );
+  String value = data_string.substring( 11 );
+  String ds = "MOISTURE=" + value;
+  ds += "&STATION=";
+  ds += station;
+  Serial.print("Sending moisture data: ");
+  Serial.println(ds);
+  post_data( ds );
+}
+
+void sendTemperatureData( String data_string ) {
+/* Split up the soil temperature data and send to the database server */
+  Serial.print("Parsing Temperature Data: ");
+  Serial.println(data_string );
+  String station = data_string.substring( 4, 10 );
+  String value = data_string.substring( 11 );
+  String ds = "SOILTEMP=" + value;
+  ds += "&STATION=";
+  ds += station;
+  Serial.print("Sending temperature data: ");
+  Serial.println(ds);
+  post_data( ds );
+
+}
 
 void setup()
 {
@@ -122,8 +227,6 @@ void setup()
 
   pinMode(TRANSMIT_LED_PIN, OUTPUT);
   digitalWrite(TRANSMIT_LED_PIN, LOW);
-
-
 
   EEPROM.begin(512);
   delay(10);
@@ -147,8 +250,6 @@ void setup()
 
 
 
-
-
 void loop() {
 
   if ( softSerial.available()) {
@@ -163,29 +264,17 @@ void loop() {
       bytes_read++;
       // If we have read the whole string post it to server
       if ( num_bytes == bytes_read ) {
-        digitalWrite(TRANSMIT_LED_PIN, HIGH);
-        delay(500);
-        digitalWrite(TRANSMIT_LED_PIN, LOW);
-        delay(250);
-        digitalWrite(TRANSMIT_LED_PIN, HIGH);
-        delay(500);
-        digitalWrite(TRANSMIT_LED_PIN, LOW);
-        delay(1000);
-        send_email(EMAIL_ADDRESS, "Rat Trap Triggered", data_string);
-        digitalWrite(TRANSMIT_LED_PIN, HIGH);
-        delay(500);
-        digitalWrite(TRANSMIT_LED_PIN, LOW);
+        if ( is_moisture_data( data_string ) ) {
+          send_moisture_data( data_string );
+        } else if ( is_temperature_data( data_string ) ) {
+          sendTemperatureData( data_string );
+        } else {
+          send_rat_trap_email( data_string );
+        }
         data_string = "";
         num_bytes = 0;
         bytes_read = 0;
       }
     }
   }
-
-
 }
-
-
-
-
-
