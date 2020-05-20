@@ -11,7 +11,6 @@
 
 #include <SoftwareSerial.h>
 #include <ESP8266WiFi.h>
-#include "Gsender.h"
 #include <EEPROM.h>
 #include <WiFiClient.h>
 #include <WiFiUdp.h>
@@ -24,9 +23,7 @@ uint16_t reconnect_interval = 10000;             // If not connected wait time t
 
 String ssid = "";
 String ssid_password = "";
-String email_login = "";
-String email_password = "";
-const String EMAIL_ADDRESS = "dqmcdonald@gmail.com";
+
 
 String data_string = "";
 int num_bytes = 0;
@@ -151,22 +148,10 @@ void Awaits()
   }
 }
 
-void send_email( const String& address, const String& subject, const String& message ) {
-
-  Gsender *gsender = Gsender::Instance(email_login, email_password );    // Getting pointer to class instance
-  if (gsender->Subject(subject)->Send(address, message)) {
-    Serial.println("Message sent.");
-  } else {
-    Serial.print("Error sending message: ");
-    Serial.println(gsender->getError());
-  }
 
 
+void send_rat_trap_data(String& data_string ) {
 
-}
-
-void send_rat_trap_email(String& data_string ) {
-  
   digitalWrite(TRANSMIT_LED_PIN, HIGH);
   delay(500);
   digitalWrite(TRANSMIT_LED_PIN, LOW);
@@ -175,7 +160,11 @@ void send_rat_trap_email(String& data_string ) {
   delay(500);
   digitalWrite(TRANSMIT_LED_PIN, LOW);
   delay(1000);
-  send_email(EMAIL_ADDRESS, "Rat Trap Triggered", data_string);
+  String station = data_string.substring( 12);
+  String ds = "LORAT=" + station;
+  Serial.print("Sending rat trap data: ");
+  Serial.println(ds);
+  post_data(ds);
   digitalWrite(TRANSMIT_LED_PIN, HIGH);
   delay(500);
   digitalWrite(TRANSMIT_LED_PIN, LOW);
@@ -190,7 +179,15 @@ bool is_temperature_data( const String& data_string ) {
 }
 
 void send_moisture_data( String data_string ) {
-/* Split up the moisture data and send to the database server */
+  /* Split up the moisture data and send to the database server */
+  digitalWrite(TRANSMIT_LED_PIN, HIGH);
+  delay(500);
+  digitalWrite(TRANSMIT_LED_PIN, LOW);
+  delay(250);
+  digitalWrite(TRANSMIT_LED_PIN, HIGH);
+  delay(500);
+  digitalWrite(TRANSMIT_LED_PIN, LOW);
+  delay(1000);
   Serial.print("Parsing Moisture Data: ");
   Serial.println(data_string );
   String station = data_string.substring( 4, 10 );
@@ -201,10 +198,21 @@ void send_moisture_data( String data_string ) {
   Serial.print("Sending moisture data: ");
   Serial.println(ds);
   post_data( ds );
+  digitalWrite(TRANSMIT_LED_PIN, HIGH);
+  delay(500);
+  digitalWrite(TRANSMIT_LED_PIN, LOW);
 }
 
 void sendTemperatureData( String data_string ) {
-/* Split up the soil temperature data and send to the database server */
+  /* Split up the soil temperature data and send to the database server */
+  digitalWrite(TRANSMIT_LED_PIN, HIGH);
+  delay(500);
+  digitalWrite(TRANSMIT_LED_PIN, LOW);
+  delay(250);
+  digitalWrite(TRANSMIT_LED_PIN, HIGH);
+  delay(500);
+  digitalWrite(TRANSMIT_LED_PIN, LOW);
+  delay(1000);
   Serial.print("Parsing Temperature Data: ");
   Serial.println(data_string );
   String station = data_string.substring( 4, 10 );
@@ -215,6 +223,9 @@ void sendTemperatureData( String data_string ) {
   Serial.print("Sending temperature data: ");
   Serial.println(ds);
   post_data( ds );
+  digitalWrite(TRANSMIT_LED_PIN, HIGH);
+  delay(500);
+  digitalWrite(TRANSMIT_LED_PIN, LOW);
 
 }
 
@@ -237,8 +248,6 @@ void setup()
   // Read fields from EEPROM:
   ssid = read_field(0);
   ssid_password = read_field(1);
-  email_login = read_field(2);
-  email_password = read_field(3);
 
   connection_state = WiFiConnect();
   if (!connection_state) // if not connected to WIFI
@@ -269,7 +278,7 @@ void loop() {
         } else if ( is_temperature_data( data_string ) ) {
           sendTemperatureData( data_string );
         } else {
-          send_rat_trap_email( data_string );
+          send_rat_trap_data( data_string );
         }
         data_string = "";
         num_bytes = 0;
